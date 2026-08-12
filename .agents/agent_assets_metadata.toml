@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "BmnlQ-pD0788JyToILbRk"
+uri = "file://outputs/agent-swarm-project-source.zip"
+type = "unspecified"
+title = "Agent Swarm project source"
+description = "Complete project source and configuration archive. Dependencies, build outputs, caches, and local workspace metadata are excluded."
