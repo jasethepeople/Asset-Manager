@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Agent Swarm Console"
+description = "A control plane for monitoring autonomous agent objectives, lineage, prompt-genotype fitness, swarm activity, and sandbox execution status."
+version = "1.0.0"
+id = "artifacts/agent-swarm-console"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22484
+
+[services.development]
+run = "pnpm --filter @workspace/agent-swarm-console run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agent-swarm-console", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/agent-swarm-console/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22484"
+BASE_PATH = "/"

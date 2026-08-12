@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: swarm
+    description: Agent swarm control-plane operations
 paths:
   /healthz:
     get:
@@ -24,7 +26,171 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /swarm/summary:
+    get:
+      operationId: getSwarmSummary
+      tags: [swarm]
+      summary: Get swarm summary
+      description: Returns aggregate swarm health and activity metrics.
+      responses:
+        "200":
+          description: Swarm summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwarmSummary"
+  /objectives:
+    get:
+      operationId: listObjectives
+      tags: [swarm]
+      summary: List objectives
+      responses:
+        "200":
+          description: Objectives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Objective"
+    post:
+      operationId: createObjective
+      tags: [swarm]
+      summary: Create an objective
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObjectiveInput"
+      responses:
+        "201":
+          description: Created objective
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Objective"
+  /objectives/{id}/dispatch:
+    post:
+      operationId: dispatchObjective
+      tags: [swarm]
+      summary: Dispatch an objective into the swarm
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Dispatched objective
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Objective"
+        "404":
+          description: Objective not found
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [swarm]
+      summary: List agents
+      responses:
+        "200":
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      tags: [swarm]
+      summary: Get an agent
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          description: Agent not found
+  /genotypes:
+    get:
+      operationId: listGenotypes
+      tags: [swarm]
+      summary: List prompt genotypes
+      responses:
+        "200":
+          description: Prompt genotypes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Genotype"
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [swarm]
+      summary: List recent activity
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: number
+            minimum: 1
+            maximum: 50
+            default: 12
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+  /sandboxes:
+    get:
+      operationId: listSandboxes
+      tags: [swarm]
+      summary: List sandbox jobs
+      responses:
+        "200":
+          description: Sandbox jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SandboxJob"
+    post:
+      operationId: createSandbox
+      tags: [swarm]
+      summary: Queue a sandbox job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SandboxInput"
+      responses:
+        "201":
+          description: Queued sandbox job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxJob"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +199,175 @@ components:
           type: string
       required:
         - status
+    SwarmSummary:
+      type: object
+      required:
+        - activeObjectives
+        - activeAgents
+        - successRate
+        - averageFitness
+        - totalSpawns
+        - mutationPressure
+        - stateBreakdown
+        - fitnessTrend
+        - updatedAt
+      properties:
+        activeObjectives:
+          type: number
+        activeAgents:
+          type: number
+        successRate:
+          type: number
+        averageFitness:
+          type: number
+        totalSpawns:
+          type: number
+        mutationPressure:
+          type: number
+        stateBreakdown:
+          type: object
+          required: [queued, running, completed, failed]
+          properties:
+            queued: { type: number }
+            running: { type: number }
+            completed: { type: number }
+            failed: { type: number }
+        fitnessTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        updatedAt:
+          type: string
+          format: date-time
+    TrendPoint:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: number }
+    Objective:
+      type: object
+      required: [id, title, description, status, priority, progress, agentCount, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        progress: { type: number }
+        agentCount: { type: number }
+        rootAgentId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ObjectiveInput:
+      type: object
+      required: [title, description, priority]
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+    Agent:
+      type: object
+      required: [id, name, status, strategy, frame, fitness, objectiveId, generation, runtimeMs, state, startedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        strategy: { type: string }
+        frame: { type: string }
+        fitness: { type: number }
+        objectiveId: { type: string }
+        parentId:
+          type: ["string", "null"]
+        generation: { type: number }
+        runtimeMs: { type: number }
+        state: { type: string }
+        failureSignature:
+          type: ["string", "null"]
+        startedAt:
+          type: string
+          format: date-time
+    Genotype:
+      type: object
+      required: [id, frame, label, strategy, adjustedScore, fertilityScore, totalSpawns, successRate, cumulativeFitness, mutationThreshold, trend, updatedAt]
+      properties:
+        id: { type: string }
+        frame: { type: string }
+        label: { type: string }
+        strategy: { type: string }
+        adjustedScore: { type: number }
+        fertilityScore: { type: number }
+        totalSpawns: { type: number }
+        successRate: { type: number }
+        cumulativeFitness: { type: number }
+        mutationThreshold: { type: number }
+        trend:
+          type: string
+          enum: [up, down, flat]
+        updatedAt:
+          type: string
+          format: date-time
+    Activity:
+      type: object
+      required: [id, type, message, timestamp, severity]
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [spawn, success, failure, mutation, dispatch, telemetry]
+        message: { type: string }
+        agentId:
+          type: ["string", "null"]
+        objectiveId:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          type: string
+          enum: [info, success, warning, danger]
+    SandboxJob:
+      type: object
+      required: [id, agentId, objectiveId, status, command, runtimeMs, telemetry, startedAt]
+      properties:
+        id: { type: string }
+        agentId: { type: string }
+        objectiveId: { type: string }
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        command: { type: string }
+        runtimeMs: { type: number }
+        exitCode:
+          type: ["number", "null"]
+        telemetry:
+          type: object
+          required: [cpu, memory, network]
+          properties:
+            cpu: { type: number }
+            memory: { type: number }
+            network: { type: number }
+        startedAt:
+          type: string
+          format: date-time
+    SandboxInput:
+      type: object
+      required: [agentId, objectiveId, command]
+      properties:
+        agentId: { type: string, minLength: 1 }
+        objectiveId: { type: string, minLength: 1 }
+        command: { type: string, minLength: 1 }
 
