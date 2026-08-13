@@ -5,5 +5,5 @@ generated = []
 id = "BmnlQ-pD0788JyToILbRk"
 uri = "file://outputs/agent-swarm-project-source.zip"
 type = "unspecified"
-title = "Agent Swarm project source"
-description = "Complete project source and configuration archive. Dependencies, build outputs, caches, and local workspace metadata are excluded."
+title = "Updated Agent Swarm project source"
+description = "Updated source archive including the live lineage view, automatic telemetry refresh, durable sandbox handoff, and local swarm execution loop."

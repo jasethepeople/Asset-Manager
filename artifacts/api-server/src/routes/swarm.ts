@@ -463,6 +463,17 @@ router.post("/objectives/:id/dispatch", async (req, res): Promise<void> => {
     failureSignature: null,
     startedAt: now,
   });
+  await db.insert(sandboxesTable).values({
+    id: `sandbox-${randomUUID().slice(0, 8)}`,
+    agentId,
+    objectiveId: params.data.id,
+    status: "queued",
+    command: "bootstrap --objective " + params.data.id,
+    runtimeMs: 0,
+    exitCode: null,
+    telemetry: { cpu: 0, memory: 0, network: 0 },
+    startedAt: now,
+  });
   await db.insert(activityTable).values({
     id: `evt-${randomUUID().slice(0, 8)}`,
     type: "dispatch",

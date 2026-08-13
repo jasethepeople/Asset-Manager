@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'wouter';
 import {
   Activity as ActivityIcon, ArrowDownRight, ArrowUpRight, Bot, Boxes, Check, ChevronRight, CircleDot,
-  Database, ExternalLink, GitBranch, LayoutDashboard, ListFilter, Loader2, Menu, Play, Plus,
+  Database, ExternalLink, GitBranch, LayoutDashboard, ListFilter, Loader2, Menu, Network, Play, Plus,
   RefreshCw, Search, Send, Settings2, ShieldCheck, Sparkles, Terminal, TriangleAlert, X,
 } from 'lucide-react';
 import {
@@ -20,6 +20,7 @@ const nav = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/objectives', label: 'Objectives', icon: Boxes },
   { href: '/agents', label: 'Agent fleet', icon: Bot },
+  { href: '/lineage', label: 'Lineage', icon: Network },
   { href: '/genotypes', label: 'Genotypes', icon: GitBranch },
   { href: '/activity', label: 'Activity', icon: ActivityIcon },
 ];
@@ -112,10 +113,10 @@ function ActivityItem({ item }: { item: any }) {
 
 export function OverviewPage() {
   const summary = useGetSwarmSummary({ query: { queryKey: getGetSwarmSummaryQueryKey(), refetchInterval: 15000 } });
-  const objectives = useListObjectives({ query: { queryKey: getListObjectivesQueryKey() } });
-  const agents = useListAgents({ query: { queryKey: getListAgentsQueryKey() } });
-  const activity = useListActivity({ limit: 5 }, { query: { queryKey: getListActivityQueryKey({ limit: 5 }) } });
-  const sandboxes = useListSandboxes({ query: { queryKey: getListSandboxesQueryKey() } });
+  const objectives = useListObjectives({ query: { queryKey: getListObjectivesQueryKey(), refetchInterval: 5000 } });
+  const agents = useListAgents({ query: { queryKey: getListAgentsQueryKey(), refetchInterval: 5000 } });
+  const activity = useListActivity({ limit: 5 }, { query: { queryKey: getListActivityQueryKey({ limit: 5 }), refetchInterval: 5000 } });
+  const sandboxes = useListSandboxes({ query: { queryKey: getListSandboxesQueryKey(), refetchInterval: 5000 } });
   const data = summary.data;
   const activeObjectives = (objectives.data ?? []).filter((item) => item.status === 'running' || item.status === 'queued').slice(0, 4);
   const liveAgents = (agents.data ?? []).filter((item) => item.status === 'running').slice(0, 5);
@@ -161,9 +162,25 @@ export function ObjectivesPage() {
 }
 
 export function AgentsPage() {
-  const query = useListAgents({ query: { queryKey: getListAgentsQueryKey() } }); const [filter, setFilter] = useState<'all' | Status>('all'); const [search, setSearch] = useState('');
+  const query = useListAgents({ query: { queryKey: getListAgentsQueryKey(), refetchInterval: 5000 } }); const [filter, setFilter] = useState<'all' | Status>('all'); const [search, setSearch] = useState('');
   const list = useMemo(() => (query.data ?? []).filter((agent) => (filter === 'all' || agent.status === filter) && `${agent.name} ${agent.strategy} ${agent.frame}`.toLowerCase().includes(search.toLowerCase())), [query.data, filter, search]);
   return <><PageHead eyebrow="Population / lineage" title="Agent fleet" subtitle="Inspect the current population, its strategy frames, and how each branch is contributing to objective fitness." action={<div className="flex items-center gap-2"><span className="panel-meta hidden sm:inline">{query.data?.length ?? 0} agents observed</span><button className="btn" onClick={() => query.refetch()} data-testid="button-refresh-agents"><RefreshCw size={14} /> Refresh fleet</button></div>} /><div className="panel"><div className="panel-header flex-wrap"><div className="segmented">{(['all', 'running', 'queued', 'completed', 'failed'] as const).map((state) => <button key={state} className={filter === state ? 'active' : ''} onClick={() => setFilter(state)} data-testid={`button-agent-filter-${state}`}>{state}</button>)}</div><div className="relative w-full sm:w-64"><Search size={14} className="absolute left-3 top-2.5 muted" /><input className="input pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search agent or strategy" data-testid="input-search-agents" /></div></div><QueryState loading={query.isLoading} error={query.isError} onRetry={() => query.refetch()} empty={!query.isLoading && !list.length} emptyLabel="No agents match this filter."><div className="table-wrap"><table className="data-table"><thead><tr><th>Agent</th><th>Status</th><th>Strategy / frame</th><th>Fitness</th><th>Lineage</th><th>Runtime</th><th /></tr></thead><tbody className="stagger">{list.map((agent) => <tr key={agent.id} data-testid={`row-agent-${agent.id}`}><td><Link href={`/agents/${agent.id}`} className="flex items-center gap-3 hover:text-primary transition-colors" data-testid={`link-agent-${agent.id}`}><div className="agent-avatar">{initials(agent.name)}</div><div><div className="font-medium">{agent.name}</div><div className="mono muted text-[10px] mt-1">{agent.id}</div></div></Link></td><td><StatusBadge status={agent.status} /></td><td><div>{agent.strategy}</div><div className="muted text-[11px] mt-1">{agent.frame}</div></td><td><span className="mono text-primary">{agent.fitness.toFixed(3)}</span></td><td><div className="mono text-xs">gen {agent.generation}</div><div className="muted mono text-[10px] mt-1">{agent.parentId ? `parent ${agent.parentId.slice(0, 8)}` : 'root branch'}</div></td><td className="mono muted">{fmtRuntime(agent.runtimeMs)}</td><td><Link href={`/agents/${agent.id}`} className="btn btn-ghost p-2" data-testid={`button-inspect-agent-${agent.id}`}><ExternalLink size={14} /></Link></td></tr>)}</tbody></table></div></QueryState></div></>;
+}
+
+export function LineagePage() {
+  const query = useListAgents({ query: { queryKey: getListAgentsQueryKey(), refetchInterval: 5000 } });
+  const agents = query.data ?? [];
+  const children = useMemo(() => agents.reduce<Record<string, typeof agents>>((map, agent) => {
+    if (agent.parentId) map[agent.parentId] = [...(map[agent.parentId] ?? []), agent];
+    return map;
+  }, {}), [agents]);
+  const roots = agents.filter((agent) => !agent.parentId);
+  return <><PageHead eyebrow="Population / evolution map" title="Lineage" subtitle="Trace how the swarm branches from root objectives into specialized generations." action={<div className="flex items-center gap-2"><span className="panel-meta hidden sm:inline">auto-refreshing every 5s</span><button className="btn" onClick={() => query.refetch()} data-testid="button-refresh-lineage"><RefreshCw size={14} /> Refresh map</button></div>} />
+    <QueryState loading={query.isLoading} error={query.isError} onRetry={() => query.refetch()} empty={!query.isLoading && !agents.length} emptyLabel="No lineage records yet."><div className="grid lg:grid-cols-2 gap-4 stagger">{roots.map((root) => <section className="panel" key={root.id} data-testid={`lineage-root-${root.id}`}><div className="panel-header"><div><div className="panel-title">{root.name}</div><div className="panel-meta mt-1">root branch · generation {root.generation}</div></div><StatusBadge status={root.status} /></div><div className="p-5"><LineageNode agent={root} /><div className="ml-5 mt-3 pl-5 border-l border-dashed border-primary/30 space-y-3">{(children[root.id] ?? []).map((child) => <div key={child.id}><LineageNode agent={child} /><div className="ml-5 mt-3 pl-5 border-l border-dashed border-border space-y-3">{(children[child.id] ?? []).map((grandchild) => <LineageNode agent={grandchild} key={grandchild.id} />)}</div></div>)}</div></div></section>)}</div></QueryState></>;
+}
+
+function LineageNode({ agent }: { agent: any }) {
+  return <Link href={`/agents/${agent.id}`} className="flex items-center gap-3 rounded-md border border-border/70 p-3 hover:border-primary/50 hover:bg-primary/[.04] transition-colors" data-testid={`lineage-node-${agent.id}`}><div className="agent-avatar">{initials(agent.name)}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-xs font-medium truncate">{agent.name}</span><StatusBadge status={agent.status} /></div><div className="muted mono text-[10px] mt-1">{agent.frame} · {agent.strategy} · gen {agent.generation}</div></div><div className="text-right"><div className="mono text-xs text-primary">{agent.fitness.toFixed(2)}</div><div className="muted mono text-[10px]">{fmtRuntime(agent.runtimeMs)}</div></div></Link>;
 }
 
 function SandboxModal({ agentId, objectiveId, onClose }: { agentId: string; objectiveId: string; onClose: () => void }) {
@@ -182,7 +199,7 @@ export function GenotypesPage() {
 }
 
 export function ActivityPage() {
-  const [limit, setLimit] = useState(25); const query = useListActivity({ limit }, { query: { queryKey: getListActivityQueryKey({ limit }) } }); const [severity, setSeverity] = useState('all'); const filtered = (query.data ?? []).filter((item) => severity === 'all' || item.severity === severity);
+  const [limit, setLimit] = useState(25); const query = useListActivity({ limit }, { query: { queryKey: getListActivityQueryKey({ limit }), refetchInterval: 5000 } }); const [severity, setSeverity] = useState('all'); const filtered = (query.data ?? []).filter((item) => severity === 'all' || item.severity === severity);
   return <><PageHead eyebrow="Observability / event stream" title="Activity" subtitle="A chronological trace of dispatches, spawns, mutations, and telemetry from the swarm engine." action={<div className="flex gap-2"><div className="segmented">{['all', 'info', 'success', 'warning', 'danger'].map((item) => <button key={item} className={severity === item ? 'active' : ''} onClick={() => setSeverity(item)} data-testid={`button-severity-${item}`}>{item}</button>)}</div><button className="btn" onClick={() => query.refetch()} data-testid="button-refresh-activity"><RefreshCw size={14} /></button></div>} /><section className="panel"><div className="panel-header"><div className="flex items-center gap-3"><ActivityIcon size={15} className="text-primary" /><div><div className="panel-title">Event timeline</div><div className="panel-meta mt-1">{filtered.length} signals · newest first</div></div></div><button className="btn btn-ghost" onClick={() => setLimit(limit === 25 ? 50 : 25)} data-testid="button-toggle-activity-limit"><ListFilter size={14} /> {limit} events</button></div><QueryState loading={query.isLoading} error={query.isError} onRetry={() => query.refetch()} empty={!query.isLoading && !filtered.length} emptyLabel="No events match this severity."><div className="p-5 max-w-3xl stagger">{filtered.map((item) => <ActivityItem item={item} key={item.id} />)}</div></QueryState></section></>;
 }
 

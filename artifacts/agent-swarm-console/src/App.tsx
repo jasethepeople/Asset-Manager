@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   AgentDetailPage, AgentsPage, GenotypesPage, ActivityPage, NotFoundPage, ObjectivesPage,
-  OverviewPage, Shell,
+  LineagePage, OverviewPage, Shell,
 } from '@/components/console-ui';
 
 const queryClient = new QueryClient({
@@ -24,6 +24,7 @@ function Router() {
     <Route path="/objectives" component={ObjectivesPage} />
     <Route path="/agents/:id" component={AgentDetailPage} />
     <Route path="/agents" component={AgentsPage} />
+    <Route path="/lineage" component={LineagePage} />
     <Route path="/genotypes" component={GenotypesPage} />
     <Route path="/activity" component={ActivityPage} />
     <Route component={NotFoundPage} />
